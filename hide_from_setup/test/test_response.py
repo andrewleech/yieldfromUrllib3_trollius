@@ -1,13 +1,14 @@
 import unittest
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 import functools
 from io import BytesIO, BufferedReader
 
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.response import HTTPResponse
-from yieldfrom.urllib3.exceptions import DecodeError
+from yieldfrom_t.urllib3.response import HTTPResponse
+from yieldfrom_t.urllib3.exceptions import DecodeError
 
 
 from base64 import b64decode
@@ -61,7 +62,7 @@ class TestResponse(unittest.TestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         else:
@@ -76,19 +77,19 @@ class TestResponse(unittest.TestCase):
     @async_test
     def test_cache_content(self):
         r = HTTPResponse('foo')
-        _d = yield from r.data
+        _d = yield From(r.data)
         self.assertEqual(_d, 'foo')
         self.assertEqual(r._body, 'foo')
 
     @async_test
     def test_default(self):
         r = HTTPResponse()
-        self.assertEqual((yield from r.data), None)
+        self.assertEqual((yield From(r.data)), None)
 
     @async_test
     def test_none(self):
         r = HTTPResponse(None)
-        _d = yield from r.data
+        _d = yield From(r.data)
         self.assertEqual(_d, None)
 
     @async_test
@@ -98,7 +99,7 @@ class TestResponse(unittest.TestCase):
         r = HTTPResponse(fp, preload_content=True)
 
         #self.assertEqual(fp.tell(), len(b'foo'))
-        self.assertEqual((yield from r.data), b'foo')
+        self.assertEqual((yield From(r.data)), b'foo')
 
     @async_test
     def test_no_preload(self):
@@ -107,7 +108,7 @@ class TestResponse(unittest.TestCase):
         r = HTTPResponse(fp, preload_content=False)
 
         #self.assertEqual(fp.tell(), 0)
-        _d = yield from r.data
+        _d = yield From(r.data)
         self.assertEqual(_d, b'foo')
         #self.assertEqual(fp.tell(), len(b'foo'))
 
@@ -117,7 +118,7 @@ class TestResponse(unittest.TestCase):
         fp.feed_data(b'\x00' * 10)
         fp.feed_eof()
         t = HTTPResponse(fp, headers={'content-encoding': 'deflate'})
-        yield from self.aioAssertRaises(DecodeError, t.init)
+        yield From(self.aioAssertRaises(DecodeError, t.init))
 
     @async_test
     def test_decode_deflate(self):
@@ -127,7 +128,7 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(data)
         r = HTTPResponse(fp, headers={'content-encoding': 'deflate'})
 
-        self.assertEqual((yield from r.data), b'foo')
+        self.assertEqual((yield From(r.data)), b'foo')
 
     @async_test
     def test_decode_deflate_case_insensitve(self):
@@ -137,7 +138,7 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(data)
         r = HTTPResponse(fp, headers={'content-encoding': 'DeFlAtE'})
 
-        self.assertEqual((yield from r.data), b'foo')
+        self.assertEqual((yield From(r.data)), b'foo')
 
     @async_test
     def test_chunked_decoding_deflate(self):
@@ -148,10 +149,10 @@ class TestResponse(unittest.TestCase):
         fp.feed_data(data)
         r = HTTPResponse(fp, headers={'content-encoding': 'deflate'},
                          preload_content=False)
-        #yield from r.init()
-        _d1 = yield from r.read(3)
-        _d2 = yield from r.read(1)
-        _d3 = yield from r.read(2)
+        #yield From(r.init())
+        _d1 = yield From(r.read(3))
+        _d2 = yield From(r.read(1))
+        _d3 = yield From(r.read(2))
         self.assertEqual(_d1, b'')
         self.assertEqual(_d2, b'f')
         self.assertEqual(_d3, b'oo')
@@ -168,12 +169,12 @@ class TestResponse(unittest.TestCase):
         r = HTTPResponse(fp, headers={'content-encoding': 'deflate'},
                          preload_content=False)
 
-        yield from r.init()
-        _d1 = yield from r.read(3)
+        yield From(r.init())
+        _d1 = yield From(r.read(3))
         self.assertEqual(_d1, b'')
-        _d2 = yield from r.read(1)
+        _d2 = yield From(r.read(1))
         self.assertEqual(_d2, b'f')
-        _d3 = yield from r.read(2)
+        _d3 = yield From(r.read(2))
         self.assertEqual(_d3, b'oo')
 
     @async_test
@@ -188,25 +189,25 @@ class TestResponse(unittest.TestCase):
         r = HTTPResponse(fp, headers={'content-encoding': 'gzip'},
                          preload_content=False)
 
-        yield from r.init()
-        _d1 = yield from r.read(10)
+        yield From(r.init())
+        _d1 = yield From(r.read(10))
         self.assertEqual(_d1, b'')
-        _d2 = yield from r.read(5)
+        _d2 = yield From(r.read(5))
         self.assertEqual(_d2, b'foo')
-        _d3 = yield from r.read(2)
+        _d3 = yield From(r.read(2))
         self.assertEqual(_d3, b'')
 
     @async_test
     def test_body_blob(self):
         resp = HTTPResponse(b'foo')
-        _d = yield from resp.data
+        _d = yield From(resp.data)
         self.assertEqual(_d, b'foo')
         self.assertTrue(resp.closed)
 
     @async_test
     def tst_io(self):
         import socket
-        from yieldfrom.http.client import HTTPResponse as OldHTTPResponse
+        from yieldfrom_t.http.client import HTTPResponse as OldHTTPResponse
 
         fp = self._fake_fp(b'foo')
         #fp = BytesIO(b'foo')
@@ -276,19 +277,19 @@ class TestResponse(unittest.TestCase):
         resp = HTTPResponse(fp, preload_content=False)
 
         barr = bytearray(3)
-        amtRead = yield from resp.readinto(barr)
+        amtRead = yield From(resp.readinto(barr))
         assert amtRead == 3
         assert b'foo' == barr
 
         # The reader should already be empty, so this should read nothing.
-        amtRead = yield from resp.readinto(barr)
+        amtRead = yield From(resp.readinto(barr))
         assert amtRead == 0
         assert b'foo' == barr
 
     def test_streaming(self):
         fp = BytesIO(b'foo')
         resp = HTTPResponse(fp, preload_content=False)
-        stream = yield from resp.stream(2, decode_content=False)
+        stream = yield From(resp.stream(2, decode_content=False))
 
         self.assertEqual(next(stream), b'fo')
         self.assertEqual(next(stream), b'o')
@@ -299,7 +300,7 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(b'foo')
         #fp = BytesIO(b'foo')
         resp = HTTPResponse(fp, preload_content=False)
-        stream = yield from resp.stream(2, decode_content=False)
+        stream = yield From(resp.stream(2, decode_content=False))
 
         position = 0
 
@@ -324,7 +325,7 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(data)
         resp = HTTPResponse(fp, headers={'content-encoding': 'gzip'},
                          preload_content=False)
-        stream = yield from resp.stream(2)
+        stream = yield From(resp.stream(2))
 
         self.assertEqual(next(stream), b'fo')
         self.assertEqual(next(stream), b'o')
@@ -342,7 +343,7 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(data)
         resp = HTTPResponse(fp, headers={'content-encoding': 'gzip'},
                          preload_content=False)
-        stream = yield from resp.stream()
+        stream = yield From(resp.stream())
 
         # Read everything
         payload = next(stream)
@@ -380,7 +381,7 @@ class TestResponse(unittest.TestCase):
                 # Amount is unused.
                 yield None
 
-                return b''.join(self.payloads)
+                raise Return (b''.join(self.payloads))
 
                 #if len(self.payloads) > 0:
                 #    return self.payloads.pop(0)
@@ -393,7 +394,7 @@ class TestResponse(unittest.TestCase):
         fp = MockCompressedDataReading(ZLIB_PAYLOAD, payload_part_size)
         resp = HTTPResponse(fp, headers={'content-encoding': 'deflate'},
                             preload_content=False)
-        stream = yield from resp.stream(payload_part_size)
+        stream = yield From(resp.stream(payload_part_size))
 
         parts_positions = []
         for part in stream:
@@ -424,10 +425,10 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(data)
         resp = HTTPResponse(fp, headers={'content-encoding': 'deflate'},
                          preload_content=False)
-        stream = resp.stream(2)
+        stream = yield From(resp.stream(2))
 
-        self.assertEqual(next(stream), b'f')
-        self.assertEqual(next(stream), b'oo')
+        self.assertEqual(next(stream), b'fo')
+        self.assertEqual(next(stream), b'o')
         self.assertRaises(StopIteration, next, stream)
 
     @async_test
@@ -440,10 +441,10 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(data)
         resp = HTTPResponse(fp, headers={'content-encoding': 'deflate'},
                          preload_content=False)
-        stream = resp.stream(2)
+        stream = yield From(resp.stream(2))
 
-        self.assertEqual(next(stream), b'f')
-        self.assertEqual(next(stream), b'oo')
+        self.assertEqual(next(stream), b'fo')
+        self.assertEqual(next(stream), b'o')
         self.assertRaises(StopIteration, next, stream)
 
     @async_test
@@ -452,7 +453,7 @@ class TestResponse(unittest.TestCase):
         fp = self._fake_fp(b'')
         #fp = BytesIO(b'')
         resp = HTTPResponse(fp, preload_content=False)
-        stream = yield from resp.stream(2, decode_content=False)
+        stream = yield From(resp.stream(2, decode_content=False))
 
         self.assertRaises(StopIteration, next, stream)
 
@@ -466,11 +467,11 @@ class TestResponse(unittest.TestCase):
 
             @asyncio.coroutine
             def read(self, amt=None):
-                data = yield from self.fp.read(amt)
+                data = yield From(self.fp.read(amt))
                 if not data:
                     self.fp = None
 
-                return data
+                raise Return (data)
 
             def close(self):
                 self.fp = None
@@ -480,7 +481,7 @@ class TestResponse(unittest.TestCase):
         fp = MockHTTPRequest()
         fp.fp = bio
         resp = HTTPResponse(fp, preload_content=False)
-        stream = yield from resp.stream(2)
+        stream = yield From(resp.stream(2))
 
         self.assertEqual(next(stream), b'fo')
         self.assertEqual(next(stream), b'o')

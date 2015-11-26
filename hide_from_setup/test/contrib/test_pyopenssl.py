@@ -1,5 +1,5 @@
 from nose.plugins.skip import SkipTest
-from yieldfrom.urllib3.packages import six
+from yieldfrom_t.urllib3.packages import six
 
 if six.PY3:
     raise SkipTest('Testing of PyOpenSSL disabled on PY3')

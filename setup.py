@@ -7,7 +7,7 @@ import os
 import re
 
 
-setup(name='yieldfrom.urllib3',
+setup(name='yieldfrom_t.urllib3',
 
       version='0.1.2',
 
@@ -33,14 +33,14 @@ setup(name='yieldfrom.urllib3',
       url='http://urllib3.readthedocs.org/',
       license='MIT',
 
-      packages=['yieldfrom', 'yieldfrom.urllib3',
-                'yieldfrom.urllib3.packages', 'yieldfrom.urllib3.packages.ssl_match_hostname',
-                'yieldfrom.urllib3.util',
+      packages=['yieldfrom_t', 'yieldfrom_t.urllib3',
+                'yieldfrom_t.urllib3.packages', 'yieldfrom_t.urllib3.packages.ssl_match_hostname',
+                'yieldfrom_t.urllib3.util',
                 ],
       #packages=find_packages(exclude=['test\*', 'test', 'dummyserver', 'dummyserver\*', '__pycache__']),
-      #packages=find_packages('yieldfrom'),
-      package_dir={'yieldfrom': 'yieldfrom'},
-      install_requires=['yieldfrom.http.client', 'setuptools'],
-      namespace_packages=['yieldfrom'],
+      #packages=find_packages('yieldfrom_t'),
+      package_dir={'yieldfrom_t': 'yieldfrom_t'},
+      install_requires=['yieldfrom-t.http.client', 'setuptools', 'trollius'],
+      namespace_packages=['yieldfrom_t'],
       zip_safe=False,
       )

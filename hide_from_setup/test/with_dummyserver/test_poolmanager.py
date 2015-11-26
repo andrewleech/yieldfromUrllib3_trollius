@@ -1,5 +1,6 @@
 import unittest
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 import json
 import functools
 
@@ -8,9 +9,9 @@ sys.path.extend(['..', '../..', '../../../'])
 
 from hide_from_setup.dummyserver.testcase import (HTTPDummyServerTestCase,
                                   IPv6HTTPDummyServerTestCase)
-from yieldfrom.urllib3.poolmanager import PoolManager
-from yieldfrom.urllib3.connectionpool import port_by_scheme
-from yieldfrom.urllib3.exceptions import MaxRetryError
+from yieldfrom_t.urllib3.poolmanager import PoolManager
+from yieldfrom_t.urllib3.connectionpool import port_by_scheme
+from yieldfrom_t.urllib3.exceptions import MaxRetryError
 
 
 def async_test(f):
@@ -38,49 +39,49 @@ class TestPoolManager(HTTPDummyServerTestCase):
     def test_redirect(self):
         http = PoolManager()
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
                                      fields={'target': '%s/' % self.base_url},
-                                     redirect=False)
+                                     redirect=False))
 
         self.assertEqual(r.status, 303)
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
-                                    fields={'target': '%s/' % self.base_url})
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
+                                    fields={'target': '%s/' % self.base_url}))
 
         self.assertEqual(r.status, 200)
-        self.assertEqual((yield from r.data), b'Dummy server!')
+        self.assertEqual((yield From(r.data)), b'Dummy server!')
 
     @async_test
     def test_redirect_twice(self):
         http = PoolManager()
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
                                      fields={'target': '%s/redirect' % self.base_url},
-                                     redirect=False)
+                                     redirect=False))
 
         self.assertEqual(r.status, 303)
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
-                         fields={'target': '%s/redirect?target=%s/' % (self.base_url, self.base_url)})
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
+                         fields={'target': '%s/redirect?target=%s/' % (self.base_url, self.base_url)}))
 
         self.assertEqual(r.status, 200)
-        self.assertEqual((yield from r.data), b'Dummy server!')
+        self.assertEqual((yield From(r.data)), b'Dummy server!')
 
     @async_test
     def test_redirect_to_relative_url(self):
         http = PoolManager()
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
                                      fields = {'target': '/redirect'},
-                                     redirect = False)
+                                     redirect = False))
 
         self.assertEqual(r.status, 303)
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
-                                     fields = {'target': '/redirect'})
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
+                                     fields = {'target': '/redirect'}))
 
         self.assertEqual(r.status, 200)
-        self.assertEqual((yield from r.data), b'Dummy server!')
+        self.assertEqual((yield From(r.data)), b'Dummy server!')
 
     @async_test
     def test_cross_host_redirect(self):
@@ -88,17 +89,17 @@ class TestPoolManager(HTTPDummyServerTestCase):
 
         cross_host_location = '%s/echo?a=b' % self.base_url_alt
         try:
-            yield from http.request('GET', '%s/redirect' % self.base_url,
+            yield From(http.request('GET', '%s/redirect' % self.base_url,
                                      fields={'target': cross_host_location},
-                                     timeout=0.1, retries=0)
+                                     timeout=0.1, retries=0))
             self.fail("Request succeeded instead of raising an exception like it should.")
 
         except MaxRetryError:
             pass
 
-        r = yield from http.request('GET', '%s/redirect' % self.base_url,
+        r = yield From(http.request('GET', '%s/redirect' % self.base_url,
                                     fields={'target': '%s/echo?a=b' % self.base_url_alt},
-                                    timeout=0.1, retries=1)
+                                    timeout=0.1, retries=1))
 
         self.assertEqual(r._pool.host, self.host_alt)
 
@@ -114,32 +115,32 @@ class TestPoolManager(HTTPDummyServerTestCase):
         # our test server happens to be listening.
         port_by_scheme['http'] = self.port
         try:
-            r = yield from http.request('GET', 'http://%s/' % self.host, retries=0)
+            r = yield From(http.request('GET', 'http://%s/' % self.host, retries=0))
         finally:
             port_by_scheme['http'] = 80
 
         self.assertEqual(r.status, 200)
-        self.assertEqual((yield from r.data), b'Dummy server!')
+        self.assertEqual((yield From(r.data)), b'Dummy server!')
 
     @async_test
     def test_headers(self):
         http = PoolManager(headers={'Foo': 'bar'})
 
-        r = yield from http.request_encode_url('GET', '%s/headers' % self.base_url)
-        returned_headers = json.loads((yield from r.data).decode())
+        r = yield From(http.request_encode_url('GET', '%s/headers' % self.base_url))
+        returned_headers = json.loads((yield From(r.data).decode()))
         self.assertEqual(returned_headers.get('Foo'), 'bar')
 
-        r = yield from http.request_encode_body('POST', '%s/headers' % self.base_url)
-        returned_headers = json.loads((yield from r.data).decode())
+        r = yield From(http.request_encode_body('POST', '%s/headers' % self.base_url))
+        returned_headers = json.loads((yield From(r.data).decode()))
         self.assertEqual(returned_headers.get('Foo'), 'bar')
 
-        r = yield from http.request_encode_url('GET', '%s/headers' % self.base_url, headers={'Baz': 'quux'})
-        returned_headers = json.loads((yield from r.data).decode())
+        r = yield From(http.request_encode_url('GET', '%s/headers' % self.base_url, headers={'Baz': 'quux'}))
+        returned_headers = json.loads((yield From(r.data).decode()))
         self.assertEqual(returned_headers.get('Foo'), None)
         self.assertEqual(returned_headers.get('Baz'), 'quux')
 
-        r = yield from http.request_encode_body('GET', '%s/headers' % self.base_url, headers={'Baz': 'quux'})
-        returned_headers = json.loads((yield from r.data).decode())
+        r = yield From(http.request_encode_body('GET', '%s/headers' % self.base_url, headers={'Baz': 'quux'}))
+        returned_headers = json.loads((yield From(r.data).decode()))
         self.assertEqual(returned_headers.get('Foo'), None)
         self.assertEqual(returned_headers.get('Baz'), 'quux')
 
@@ -147,7 +148,7 @@ class TestPoolManager(HTTPDummyServerTestCase):
     def test_http_with_ssl_keywords(self):
         http = PoolManager(ca_certs='REQUIRED')
 
-        r = yield from http.request('GET', 'http://%s:%s/' % (self.host, self.port))
+        r = yield From(http.request('GET', 'http://%s:%s/' % (self.host, self.port)))
         self.assertEqual(r.status, 200)
 
 
@@ -158,7 +159,7 @@ class TestIPv6PoolManager(IPv6HTTPDummyServerTestCase):
     @async_test
     def test_ipv6(self):
         http = PoolManager()
-        yield from http.request('GET', self.base_url)
+        yield From(http.request('GET', self.base_url))
 
 if __name__ == '__main__':
     unittest.main()

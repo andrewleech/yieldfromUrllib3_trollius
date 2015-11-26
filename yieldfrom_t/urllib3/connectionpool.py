@@ -5,10 +5,11 @@ import warnings
 
 from socket import error as SocketError, timeout as SocketTimeout
 import socket
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
 #from queue import LifoQueue, Empty, Full
-from asyncio.queues import LifoQueue, QueueEmpty, QueueFull
+from trollius.queues import LifoQueue, QueueEmpty, QueueFull
 
 from .exceptions import (
     ClosedPoolError,
@@ -205,7 +206,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
         try:
             timeout = Timeout.from_float(timeout)
             try:
-                conn = yield from asyncio.wait_for(self.pool.get(), timeout.connect_timeout)
+                conn = yield From(asyncio.wait_for(self.pool.get(), timeout.connect_timeout))
                 pass
 
             except AttributeError:  # self.pool is None
@@ -231,7 +232,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
                 # attempt to bypass the proxy)
                 conn = None
 
-        return conn or self._new_conn()
+        raise Return (conn or self._new_conn())
 
     def _put_conn(self, conn):
         """
@@ -306,11 +307,11 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
         conn.timeout = timeout_obj.connect_timeout
 
         # Trigger any extra validation we need to do.
-        yield from self._validate_conn(conn)
+        yield From(self._validate_conn(conn))
 
         # conn.request() calls httplib.*.request, not the method in
         # urllib3.request. It also calls makefile (recv) on the socket.
-        yield from conn.request(method, url, **httplib_request_kw)
+        yield From(conn.request(method, url, **httplib_request_kw))
 
         # Reset the timeout for the recv() on the socket
         read_timeout = timeout_obj.read_timeout
@@ -333,7 +334,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
 
         # Receive the response from the server
         try:
-            httplib_response = yield from conn.getresponse() #buffering=True)
+            httplib_response = yield From(conn.getresponse()) #buffering=True))
         except asyncio.TimeoutError:
             raise ReadTimeoutError(
                 self, url, "Read timed out. (read timeout=%s)" % self.timeout)
@@ -358,7 +359,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
         log.debug("\"%s %s %s\" %s %s" % (method, url, http_version,
                                           httplib_response.status,
                                           httplib_response.length))
-        return httplib_response
+        raise Return (httplib_response)
 
     def close(self):
         """
@@ -507,14 +508,14 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
 
         try:
             # Request a connection from the queue.
-            conn = yield from self._get_conn(timeout=pool_timeout)
+            conn = yield From(self._get_conn(timeout=pool_timeout))
 
             # Make the request on the httplib connection object.
-            httplib_response = yield from self._make_request(conn, method, url,
+            httplib_response = yield From(self._make_request(conn, method, url,
                                                              timeout=timeout,
-                                                             body=body, headers=headers)
+                                                             body=body, headers=headers))
             #if httplib_response.fp is None:
-            #    yield from httplib_response.init() # necessary?
+            #    yield From(httplib_response.init() # necessary?)
 
             # If we're going to release the connection in ``finally:``, then
             # the request doesn't need to know about the connection. Otherwise
@@ -528,7 +529,7 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
                                                  connection=response_conn,
                                                  **response_kw)
 
-            response = yield from respGen
+            response = yield From(respGen)
 
             # else:
             #     The connection will be put back into the pool when
@@ -576,11 +577,11 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
             # Try again
             log.warning("Retrying (%r) after connection "
                         "broken by '%r': %s" % (retries, err, url))
-            _d = yield from self.urlopen(method, url, body, headers, retries,
+            _d = yield From(self.urlopen(method, url, body, headers, retries,
                                 redirect, assert_same_host,
                                 timeout=timeout, pool_timeout=pool_timeout,
-                                release_conn=release_conn, **response_kw)
-            return _d
+                                release_conn=release_conn, **response_kw))
+            raise Return (_d)
 
         # Handle redirect?
         redirect_location = redirect and response.get_redirect_location()
@@ -593,29 +594,29 @@ class HTTPConnectionPool(ConnectionPool, RequestMethods):
             except MaxRetryError:
                 if retries.raise_on_redirect:
                     raise
-                return response
+                raise Return (response)
 
             log.info("Redirecting %s -> %s" % (url, redirect_location))
-            _d = yield from self.urlopen(method, redirect_location, body, headers,
+            _d = yield From(self.urlopen(method, redirect_location, body, headers,
                     retries=retries, redirect=redirect,
                     assert_same_host=assert_same_host,
                     timeout=timeout, pool_timeout=pool_timeout,
-                    release_conn=release_conn, **response_kw)
-            return _d
+                    release_conn=release_conn, **response_kw))
+            raise Return (_d)
 
         # Check if we should retry the HTTP response.
         if retries.is_forced_retry(method, status_code=response.status):
             retries = retries.increment(method, url, response=response, _pool=self)
             retries.sleep()
             log.info("Forced retry: %s" % url)
-            _d = yield from self.urlopen(method, url, body, headers,
+            _d = yield From(self.urlopen(method, url, body, headers,
                     retries=retries, redirect=redirect,
                     assert_same_host=assert_same_host,
                     timeout=timeout, pool_timeout=pool_timeout,
-                    release_conn=release_conn, **response_kw)
-            return _d
+                    release_conn=release_conn, **response_kw))
+            raise Return (_d)
 
-        return response
+        raise Return (response)
 
 
 class HTTPSConnectionPool(HTTPConnectionPool):
@@ -723,11 +724,11 @@ class HTTPSConnectionPool(HTTPConnectionPool):
         Called right before a request is made, after the socket is created.
         """
         vcs = super(HTTPSConnectionPool, self)
-        yield from vcs._validate_conn(conn)
+        yield From(vcs._validate_conn(conn))
 
         # Force connect early to allow us to validate the connection.
         if not getattr(conn, 'sock', None):  # AppEngine might not have  `.sock`
-            yield from conn.connect()
+            yield From(conn.connect())
 
         if not conn.is_verified:
             warnings.warn((

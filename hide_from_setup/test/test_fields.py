@@ -3,8 +3,8 @@ import unittest
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.fields import guess_content_type, RequestField
-from yieldfrom.urllib3.packages.six import u
+from yieldfrom_t.urllib3.fields import guess_content_type, RequestField
+from yieldfrom_t.urllib3.packages.six import u
 
 
 class TestRequestField(unittest.TestCase):

@@ -1,13 +1,14 @@
 import zlib
 import io
-from yieldfrom.http.client import HTTPResponse as _HTTPResponse
+from yieldfrom_t.http.client import HTTPResponse as _HTTPResponse
 
 from ._collections import HTTPHeaderDict
 from .exceptions import ProtocolError, DecodeError, ReadTimeoutError
 from .packages.six import string_types as basestring, binary_type
 from .connection import HTTPException, BaseSSLError
 
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
 
 class DeflateDecoder(object):
@@ -111,7 +112,7 @@ class HTTPResponse(io.IOBase):
     @asyncio.coroutine
     def init(self):
         if self.preload_content and not self._body:
-            self._body = yield from self.read(decode_content=self.decode_content)
+            self._body = yield From(self.read(decode_content=self.decode_content))
 
     def get_redirect_location(self):
         """
@@ -138,11 +139,11 @@ class HTTPResponse(io.IOBase):
     def data(self):
         # For backwords-compat with earlier urllib3 0.4 and earlier.
         if self._body:
-            return self._body
+            raise Return (self._body)
 
         if self._fp:
-            _d = yield from self.read(cache_content=True)
-            return _d
+            _d = yield From(self.read(cache_content=True))
+            raise Return (_d)
 
     def tell(self):
         """
@@ -192,11 +193,11 @@ class HTTPResponse(io.IOBase):
             try:
                 if amt is None:
                     # cStringIO doesn't like amt=None
-                    data = yield from self._fp.read()
+                    data = yield From(self._fp.read())
                     flush_decoder = True
                 else:
                     cache_content = False
-                    data = yield from self._fp.read(amt)
+                    data = yield From(self._fp.read(amt))
                     if amt != 0 and not data:  # Platform-specific: Buggy versions of Python.
                         # Close the connection when no data is returned
                         #
@@ -243,7 +244,7 @@ class HTTPResponse(io.IOBase):
             if cache_content:
                 self._body = data
 
-            return data
+            raise Return (data)
 
         finally:
             if self._original_response and self._original_response.isclosed():
@@ -262,7 +263,7 @@ class HTTPResponse(io.IOBase):
 
         So you can write similar usage:
 
-        for block in (yield from resp.stream):
+        for block in (yield From(resp.stream):)
           # do something with block
 
         :param amt:
@@ -275,7 +276,7 @@ class HTTPResponse(io.IOBase):
             If True, will attempt to decode the body based on the
             'content-encoding' header.
         """
-        allData = yield from self.read(decode_content=decode_content)
+        allData = yield From(self.read(decode_content=decode_content))
 
         dataBlocks = []
         while allData:
@@ -283,7 +284,7 @@ class HTTPResponse(io.IOBase):
             dataBlocks.append(block)
             allData = allData[amt:]
 
-        return iter(dataBlocks)
+        raise Return (iter(dataBlocks))
 
     @classmethod
     @asyncio.coroutine
@@ -311,8 +312,8 @@ class HTTPResponse(io.IOBase):
                            original_response=r,
                            **response_kw)
 
-        yield from r.init()
-        return r
+        yield From(r.init())
+        raise Return (r)
 
     # Backwards-compatibility methods for httplib.HTTPResponse
     def getheaders(self):
@@ -365,13 +366,13 @@ class HTTPResponse(io.IOBase):
     def readinto(self, b):
         # This method is required for `io` module compatibility.
         bLen = len(b)
-        bytes = yield from self._fp.read(bLen)
+        bytes = yield From(self._fp.read(bLen))
         bytesLen = len(bytes)
         b[:bytesLen] = bytes
-        return len(bytes)
-        # temp = yield from self.read(len(b))
+        raise Return (len(bytes))
+        # temp = yield From(self.read(len(b)))
         # if len(temp) == 0:
-        #     return 0
+        #     raise Return (0)
         # else:
         #     b[:len(temp)] = temp
-        #     return len(temp)
+        #     raise Return (len(temp))

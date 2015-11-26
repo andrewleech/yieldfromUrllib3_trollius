@@ -20,6 +20,7 @@ Since the 'yield from coroutine' statements block the current method until the s
 can be a statement-for-statement replacement for the original, and the architecture of the app is unchanged.  No
 callbacks anywhere.
 
+yieldfrom_t is a direct port of yieldfrom to trollius syntax for use with python 2.7 etc.
 
 imports
 =======
@@ -30,14 +31,14 @@ Instead of importing like:
 	from urllib import connections
 
 use:
-	from yieldfrom.urllib.connections import HTTPConnection
-	from yieldfrom.urllib import connections
+	from yieldfrom_t.urllib.connections import HTTPConnection
+	from yieldfrom_t.urllib import connections
 
 
 Classes HTTPConnection and HTTPSConnection
 ==========================================
 
-The *connect* method is now a coroutine.  Call it with yield from, like 'c = yield from conn.connect(...)', and
+The *connect* method is now a coroutine.  Call it with yield from, like 'c = yield From(conn.connect(...))', and
 otherwise the argument list is the same.
 
 
@@ -46,7 +47,7 @@ Classes HTTPConnectionPool, PoolManager, and ProxyManager
 
 These classes all feature methods *urlopen*, *request*, *request_encode_url*, and *request_encode_body* , which
 have become coroutines.  The argument list is unchanged, and the functionality is unchanged.  Just call it with
-'yield from' as a coroutine.
+'yield From()' as a coroutine.
 
 
 Class HTTPResponse
@@ -58,7 +59,7 @@ moved to the *init()* method.  Run it as a coroutine after constructing an HTTPR
 the module won't be creating HTTPResponses directly, so this should not be much of an issue.
 
 The *read*, *readinto*, *stream* methods are all coroutines.  The *data* attribute is actually a property, now
-a coroutine, and should be referenced with the *yield* *from* syntax, like 'd = yield from resp.data'.
+a coroutine, and should be referenced with the *yield* *From* syntax, like 'd = yield From(resp.data)'.
 
 
 The *from_httplib* classmethod is a coroutine also, though you probably won't be using it directly.

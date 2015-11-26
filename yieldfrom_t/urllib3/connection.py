@@ -4,9 +4,10 @@ import socket
 from socket import timeout as SocketTimeout
 import warnings
 from .packages import six
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
-from yieldfrom.http.client import HTTPConnection as _HTTPConnection, HTTPSConnection as _HTTPSConnection, \
+from yieldfrom_t.http.client import HTTPConnection as _HTTPConnection, HTTPSConnection as _HTTPSConnection, \
     HTTPException, create_connection as _create_connection
 
 #try:  # Python 3
@@ -67,8 +68,8 @@ RECENT_DATE = datetime.date(2014, 1, 1)
 @asyncio.coroutine
 def create_connection(address, *args, **kwargs):
     try:
-        _r = yield from _create_connection(address, *args, **kwargs)
-        return _r
+        _r = yield From(_create_connection(address, *args, **kwargs))
+        raise Return (_r)
     except (OSError, asyncio.TimeoutError) as e:
         raise ConnectTimeoutError
     except socket.gaierror as e:
@@ -211,14 +212,14 @@ class HTTPSConnection(HTTPConnection):
             server_hostname = self.host
         sni_hostname = server_hostname if ssl.HAS_SNI else None  # will be useful eventually
 
-        ns = yield from self._create_connection((self.host, self.port), self.timeout,
+        ns = yield From(self._create_connection((self.host, self.port), self.timeout,
                                                        self.source_address, ssl=self._context,
-                                                       server_hostname=server_hostname)
+                                                       server_hostname=server_hostname))
 
         self.notSock = ns
 
         if self._tunnel_host:
-            yield from self._tunnel()
+            yield From(self._tunnel())
             self.auto_open = 0
 
         # self.sock = self._context.wrap_socket(self.sock, server_hostname=sni_hostname,
@@ -276,7 +277,7 @@ class VerifiedHTTPSConnection(HTTPSConnection):
                                      server_hostname=server_hostname,
                                      ssl_version=resolved_ssl_version)
 
-        yield from super(VerifiedHTTPSConnection, self).connect()
+        yield From(super(VerifiedHTTPSConnection, self).connect())
 
         # # Wrap socket using verification with the root certs in
         # # trusted_root_certs

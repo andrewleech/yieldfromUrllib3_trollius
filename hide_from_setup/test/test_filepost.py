@@ -3,9 +3,9 @@ import unittest
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.filepost import encode_multipart_formdata, iter_fields
-from yieldfrom.urllib3.fields import RequestField
-from yieldfrom.urllib3.packages.six import b, u
+from yieldfrom_t.urllib3.filepost import encode_multipart_formdata, iter_fields
+from yieldfrom_t.urllib3.fields import RequestField
+from yieldfrom_t.urllib3.packages.six import b, u
 
 
 BOUNDARY = '!! test boundary !!'

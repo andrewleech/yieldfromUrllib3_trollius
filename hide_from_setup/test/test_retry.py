@@ -3,9 +3,9 @@ import unittest
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.packages.six.moves import xrange
-from yieldfrom.urllib3.util.retry import Retry
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.packages.six.moves import xrange
+from yieldfrom_t.urllib3.util.retry import Retry
+from yieldfrom_t.urllib3.exceptions import (
     ConnectTimeoutError,
     ReadTimeoutError,
     MaxRetryError

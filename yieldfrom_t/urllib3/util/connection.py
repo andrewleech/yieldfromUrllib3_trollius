@@ -1,5 +1,4 @@
 import socket
-import asyncio
 
 # try:
 #     from select import poll, POLLIN

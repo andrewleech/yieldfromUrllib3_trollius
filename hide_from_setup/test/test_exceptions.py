@@ -4,11 +4,11 @@ import pickle
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.exceptions import (HTTPError, MaxRetryError, LocationParseError,
+from yieldfrom_t.urllib3.exceptions import (HTTPError, MaxRetryError, LocationParseError,
                                 ClosedPoolError, EmptyPoolError,
                                 HostChangedError, ReadTimeoutError,
                                 ConnectTimeoutError)
-from yieldfrom.urllib3.connectionpool import HTTPConnectionPool
+from yieldfrom_t.urllib3.connectionpool import HTTPConnectionPool
 
 
 

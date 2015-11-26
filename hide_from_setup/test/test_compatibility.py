@@ -5,7 +5,7 @@ import sys
 #sys.path.append('..')
 sys.path.append('../../')
 
-from yieldfrom.urllib3.connection import HTTPConnection
+from yieldfrom_t.urllib3.connection import HTTPConnection
 
 
 class TestVersionCompatibility(unittest.TestCase):

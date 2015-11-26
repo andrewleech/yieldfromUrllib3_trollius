@@ -3,7 +3,7 @@ import unittest
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.poolmanager import ProxyManager
+from yieldfrom_t.urllib3.poolmanager import ProxyManager
 
 
 class TestProxyManager(unittest.TestCase):

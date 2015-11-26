@@ -1,11 +1,12 @@
 import unittest
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3.poolmanager import PoolManager
-from yieldfrom.urllib3 import connection_from_url
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.poolmanager import PoolManager
+from yieldfrom_t.urllib3 import connection_from_url
+from yieldfrom_t.urllib3.exceptions import (
     ClosedPoolError,
     LocationValueError,
 )
@@ -17,7 +18,7 @@ class TestPoolManager(unittest.TestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         else:

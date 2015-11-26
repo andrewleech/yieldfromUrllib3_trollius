@@ -1,7 +1,8 @@
 # TODO: Break this module up into pieces. Maybe group by functionality tested
 # rather than the socket level-ness of it.
 
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 import functools
 
 import sys
@@ -9,18 +10,18 @@ import sys
 
 sys.path.extend(['..', '../..', '../../..'])
 
-from yieldfrom.urllib3 import HTTPConnectionPool, HTTPSConnectionPool
-from yieldfrom.urllib3.poolmanager import proxy_from_url
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3 import HTTPConnectionPool, HTTPSConnectionPool
+from yieldfrom_t.urllib3.poolmanager import proxy_from_url
+from yieldfrom_t.urllib3.exceptions import (
         MaxRetryError,
         ProxyError,
         ReadTimeoutError,
         SSLError,
         ProtocolError,
 )
-from yieldfrom.urllib3.util.ssl_ import HAS_SNI
-from yieldfrom.urllib3.util.timeout import Timeout
-from yieldfrom.urllib3.util.retry import Retry
+from yieldfrom_t.urllib3.util.ssl_ import HAS_SNI
+from yieldfrom_t.urllib3.util.timeout import Timeout
+from yieldfrom_t.urllib3.util.retry import Retry
 
 from hide_from_setup.dummyserver.testcase import SocketDummyServerTestCase
 from hide_from_setup.dummyserver.server import (
@@ -50,7 +51,7 @@ class TestCookies(SocketDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:
@@ -75,7 +76,7 @@ class TestCookies(SocketDummyServerTestCase):
 
         self._start_server(multicookie_response_handler)
         pool = HTTPConnectionPool(self.host, self.port)
-        r = yield from pool.request('GET', '/', retries=0)
+        r = yield From(pool.request('GET', '/', retries=0))
         self.assertEqual(r.headers, {'set-cookie': 'foo=1, bar=1'})
 
 
@@ -84,7 +85,7 @@ class TestSNI(SocketDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:
@@ -110,7 +111,7 @@ class TestSNI(SocketDummyServerTestCase):
         self._start_server(socket_handler)
         pool = HTTPSConnectionPool(self.host, self.port)
         try:
-            yield from pool.request('GET', '/', retries=0)
+            yield From(pool.request('GET', '/', retries=0))
         except SSLError: # We are violating the protocol
             pass
         done_receiving.wait()
@@ -123,7 +124,7 @@ class TestSocketClosing(SocketDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:
@@ -160,15 +161,15 @@ class TestSocketClosing(SocketDummyServerTestCase):
         self._start_server(socket_handler)
         pool = HTTPConnectionPool(self.host, self.port)
 
-        response = yield from pool.request('GET', '/', retries=0)
+        response = yield From(pool.request('GET', '/', retries=0))
         self.assertEqual(response.status, 200)
-        self.assertEqual((yield from response.data), b'Response 0')
+        self.assertEqual((yield From(response.data), b'Response 0'))
 
         done_closing.wait()  # wait until the socket in our pool gets closed
 
-        response = yield from pool.request('GET', '/', retries=0)
+        response = yield From(pool.request('GET', '/', retries=0))
         self.assertEqual(response.status, 200)
-        self.assertEqual((yield from response.data), b'Response 1')
+        self.assertEqual((yield From(response.data), b'Response 1'))
 
     @async_test
     def test_connection_refused(self):
@@ -232,9 +233,9 @@ class TestSocketClosing(SocketDummyServerTestCase):
             t = Timeout(connect=0.1, read=0.1)
             pool = HTTPConnectionPool(self.host, self.port, timeout=t)
 
-            response = yield from pool.request('GET', '/', retries=1)
+            response = yield From(pool.request('GET', '/', retries=1))
             self.assertEqual(response.status, 200)
-            self.assertEqual((yield from response.data), b'Response 2')
+            self.assertEqual((yield From(response.data), b'Response 2'))
         finally:
             socket.setdefaulttimeout(default_timeout)
 
@@ -260,8 +261,8 @@ class TestSocketClosing(SocketDummyServerTestCase):
         self._start_server(socket_handler)
         pool = HTTPConnectionPool(self.host, self.port)
 
-        response = yield from pool.urlopen('GET', '/', retries=0, preload_content=False,
-                                timeout=Timeout(connect=1, read=0.1))
+        response = yield From(pool.urlopen('GET', '/', retries=0, preload_content=False,
+                                timeout=Timeout(connect=1, read=0.1)))
         try:
             self.aioAssertRaises(ReadTimeoutError, response.read)
         finally:
@@ -293,7 +294,7 @@ class TestSocketClosing(SocketDummyServerTestCase):
         self._start_server(socket_handler)
         pool = HTTPConnectionPool(self.host, self.port)
 
-        response = yield from pool.request('GET', '/', retries=0, preload_content=False)
+        response = yield From(pool.request('GET', '/', retries=0, preload_content=False))
         self.aioAssertRaises(ProtocolError, response.read)
 
     def test_retry_weird_http_version(self):
@@ -334,9 +335,9 @@ class TestSocketClosing(SocketDummyServerTestCase):
         self._start_server(socket_handler)
         pool = HTTPConnectionPool(self.host, self.port)
         retry = Retry(read=1)
-        response = yield from pool.request('GET', '/', retries=retry)
+        response = yield From(pool.request('GET', '/', retries=retry))
         self.assertEqual(response.status, 200)
-        self.assertEqual((yield from response.data), b'foo')
+        self.assertEqual((yield From(response.data), b'foo'))
 
 
 
@@ -345,7 +346,7 @@ class TestProxyManager(SocketDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:
@@ -373,13 +374,13 @@ class TestProxyManager(SocketDummyServerTestCase):
         base_url = 'http://%s:%d' % (self.host, self.port)
         proxy = proxy_from_url(base_url)
 
-        r = yield from proxy.request('GET', 'http://google.com/')
+        r = yield From(proxy.request('GET', 'http://google.com/'))
 
         self.assertEqual(r.status, 200)
         # FIXME: The order of the headers is not predictable right now. We
         # should fix that someday (maybe when we migrate to
         # OrderedDict/MultiDict).
-        self.assertEqual(sorted((yield from r.data).split(b'\r\n')),
+        self.assertEqual(sorted((yield From(r.data)).split(b'\r\n')),
                          sorted([
                              b'GET http://google.com/ HTTP/1.1',
                              b'Host: google.com',
@@ -414,13 +415,13 @@ class TestProxyManager(SocketDummyServerTestCase):
 
         conn = proxy.connection_from_url('http://www.google.com/')
 
-        r = yield from conn.urlopen('GET', 'http://www.google.com/', assert_same_host=False)
+        r = yield From(conn.urlopen('GET', 'http://www.google.com/', assert_same_host=False))
 
         self.assertEqual(r.status, 200)
         # FIXME: The order of the headers is not predictable right now. We
         # should fix that someday (maybe when we migrate to
         # OrderedDict/MultiDict).
-        self.assertTrue(b'For The Proxy: YEAH!\r\n' in (yield from r.data))
+        self.assertTrue(b'For The Proxy: YEAH!\r\n' in (yield From(r.data)))
 
     @async_test
     def test_retries(self):
@@ -449,8 +450,8 @@ class TestProxyManager(SocketDummyServerTestCase):
         proxy = proxy_from_url(base_url)
         conn = proxy.connection_from_url('http://www.google.com')
 
-        r = yield from conn.urlopen('GET', 'http://www.google.com',
-                         assert_same_host=False, retries=1)
+        r = yield From(conn.urlopen('GET', 'http://www.google.com',
+                         assert_same_host=False, retries=1))
         self.assertEqual(r.status, 200)
 
         self.aioAssertRaises(ProxyError, conn.urlopen, 'GET',
@@ -507,9 +508,9 @@ class TestProxyManager(SocketDummyServerTestCase):
 
         url = 'https://{0}'.format(self.host)
         conn = proxy.connection_from_url(url)
-        r = yield from conn.urlopen('GET', url, retries=0)
+        r = yield From(conn.urlopen('GET', url, retries=0))
         self.assertEqual(r.status, 200)
-        r = yield from conn.urlopen('GET', url, retries=0)
+        r = yield From(conn.urlopen('GET', url, retries=0))
         self.assertEqual(r.status, 200)
 
 
@@ -518,7 +519,7 @@ class TestSSL(SocketDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:
@@ -587,8 +588,8 @@ class TestSSL(SocketDummyServerTestCase):
         self._start_server(socket_handler)
         pool = HTTPSConnectionPool(self.host, self.port)
 
-        response = yield from pool.urlopen('GET', '/', retries=0, preload_content=False,
-                                timeout=Timeout(connect=1, read=0.5))
+        response = yield From(pool.urlopen('GET', '/', retries=0, preload_content=False,
+                                timeout=Timeout(connect=1, read=0.5)))
         try:
             self.aioAssertRaises(ReadTimeoutError, response.read)
         finally:
@@ -617,7 +618,7 @@ class TestErrorWrapping(SocketDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:

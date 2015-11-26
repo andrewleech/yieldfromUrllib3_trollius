@@ -4,11 +4,11 @@ import errno
 import functools
 import socket
 
-from nose.plugins.skip import SkipTest
+from unittest import SkipTest
 sys.path.append('../../')
 
-from yieldfrom.urllib3.exceptions import MaxRetryError, HTTPWarning
-from yieldfrom.urllib3.packages import six
+from yieldfrom_t.urllib3.exceptions import MaxRetryError, HTTPWarning
+from yieldfrom_t.urllib3.packages import six
 
 # We need a host that will not immediately close the connection with a TCP
 # Reset. SO suggests this hostname

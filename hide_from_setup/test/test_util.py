@@ -9,23 +9,23 @@ from mock import patch
 import sys
 sys.path.append('../../')
 
-from yieldfrom.urllib3 import add_stderr_logger, disable_warnings
-from yieldfrom.urllib3.util.request import make_headers
-from yieldfrom.urllib3.util.timeout import Timeout
-from yieldfrom.urllib3.util.url import (
+from yieldfrom_t.urllib3 import add_stderr_logger, disable_warnings
+from yieldfrom_t.urllib3.util.request import make_headers
+from yieldfrom_t.urllib3.util.timeout import Timeout
+from yieldfrom_t.urllib3.util.url import (
     get_host,
     parse_url,
     split_first,
     Url,
 )
-from yieldfrom.urllib3.util.ssl_ import resolve_cert_reqs
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.util.ssl_ import resolve_cert_reqs
+from yieldfrom_t.urllib3.exceptions import (
     LocationParseError,
     TimeoutStateError,
     InsecureRequestWarning,
 )
 
-from yieldfrom.urllib3.util import is_fp_closed
+from yieldfrom_t.urllib3.util import is_fp_closed
 
 import sys
 sys.path.append('.')
@@ -229,7 +229,7 @@ class TestUtil(unittest.TestCase):
 
     def test_add_stderr_logger(self):
         handler = add_stderr_logger(level=logging.INFO) # Don't actually print debug
-        logger = logging.getLogger('yieldfrom.urllib3')
+        logger = logging.getLogger('yieldfrom_t.urllib3')
         self.assertTrue(handler in logger.handlers)
 
         logger.debug('Testing add_stderr_logger')
@@ -280,7 +280,7 @@ class TestUtil(unittest.TestCase):
             self.assertTrue('int or float' in str(e))
 
 
-    @patch('yieldfrom.urllib3.util.timeout.current_time')
+    @patch('yieldfrom_t.urllib3.util.timeout.current_time')
     def test_timeout(self, current_time):
         timeout = Timeout(total=3)
 
@@ -327,7 +327,7 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(str(timeout), "Timeout(connect=1, read=None, total=3)")
 
 
-    @patch('yieldfrom.urllib3.util.timeout.current_time')
+    @patch('yieldfrom_t.urllib3.util.timeout.current_time')
     def test_timeout_elapsed(self, current_time):
         current_time.return_value = TIMEOUT_EPOCH
         timeout = Timeout(total=3)

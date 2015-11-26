@@ -1,4 +1,4 @@
-import asyncio
+import trollius as asyncio
 
 def is_fp_closed(obj):
     """

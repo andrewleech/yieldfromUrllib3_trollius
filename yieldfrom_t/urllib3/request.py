@@ -1,4 +1,5 @@
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
 try:
     from urllib.parse import urlencode
@@ -66,12 +67,12 @@ class RequestMethods(object):
         method = method.upper()
 
         if method in self._encode_url_methods:
-            _d = yield from self.request_encode_url(method, url, fields=fields,
-                                                    headers=headers, **urlopen_kw)
+            _d = yield From(self.request_encode_url(method, url, fields=fields,
+                                                    headers=headers, **urlopen_kw))
         else:
-            _d = yield from self.request_encode_body(method, url, fields=fields,
-                                                     headers=headers, **urlopen_kw)
-        return _d
+            _d = yield From(self.request_encode_body(method, url, fields=fields,
+                                                     headers=headers, **urlopen_kw))
+        raise Return (_d)
 
     @asyncio.coroutine
     def request_encode_url(self, method, url, fields=None, **urlopen_kw):
@@ -81,8 +82,8 @@ class RequestMethods(object):
         """
         if fields:
             url += '?' + urlencode(fields)
-        _d = yield from self.urlopen(method, url, **urlopen_kw)
-        return _d
+        _d = yield From(self.urlopen(method, url, **urlopen_kw))
+        raise Return (_d)
 
     @asyncio.coroutine
     def request_encode_body(self, method, url, fields=None, headers=None,
@@ -136,6 +137,6 @@ class RequestMethods(object):
         headers_ = {'Content-Type': content_type}
         headers_.update(headers)
 
-        _d = yield from self.urlopen(method, url, body=body, headers=headers_,
-                                     **urlopen_kw)
-        return _d
+        _d = yield From(self.urlopen(method, url, body=body, headers=headers_,
+                                     **urlopen_kw))
+        raise Return (_d)

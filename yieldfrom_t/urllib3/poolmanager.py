@@ -1,5 +1,6 @@
 import logging
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
 try:  # Python 3
     from urllib.parse import urljoin
@@ -149,13 +150,13 @@ class PoolManager(RequestMethods):
             kw['headers'] = self.headers
 
         if self.proxy is not None and u.scheme == "http":
-            response = yield from conn.urlopen(method, url, **kw)
+            response = yield From(conn.urlopen(method, url, **kw))
         else:
-            response = yield from conn.urlopen(method, u.request_uri, **kw)
+            response = yield From(conn.urlopen(method, u.request_uri, **kw))
 
         redirect_location = redirect and response.get_redirect_location()
         if not redirect_location:
-            return response
+            raise Return (response)
 
         # Support relative URLs for redirecting.
         redirect_location = urljoin(url, redirect_location)
@@ -172,8 +173,8 @@ class PoolManager(RequestMethods):
         kw['redirect'] = redirect
 
         log.info("Redirecting %s -> %s" % (url, redirect_location))
-        _d = yield from self.urlopen(method, redirect_location, **kw)
-        return _d
+        _d = yield From(self.urlopen(method, redirect_location, **kw))
+        raise Return (_d)
 
 
 class ProxyManager(PoolManager):
@@ -261,8 +262,8 @@ class ProxyManager(PoolManager):
             headers = kw.get('headers', self.headers)
             kw['headers'] = self._set_proxy_headers(url, headers)
 
-        _d = yield from super(ProxyManager, self).urlopen(method, url, redirect=redirect, **kw)
-        return _d
+        _d = yield From(super(ProxyManager, self).urlopen(method, url, redirect=redirect, **kw))
+        raise Return (_d)
 
 
 def proxy_from_url(url, **kw):

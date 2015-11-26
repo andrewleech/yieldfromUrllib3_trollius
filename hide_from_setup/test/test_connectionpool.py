@@ -1,7 +1,8 @@
 import unittest
 import os
 import functools
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
 import sys
 sys.path.append('../../')
@@ -9,14 +10,14 @@ sys.path.append('../../')
 
 os.environ['PYTHONASYNCIODEBUG'] = '1'
 
-from yieldfrom.urllib3.connectionpool import (
+from yieldfrom_t.urllib3.connectionpool import (
     connection_from_url,
     HTTPConnection,
     HTTPConnectionPool,
 )
-from yieldfrom.urllib3.util.timeout import Timeout
-from yieldfrom.urllib3.packages.ssl_match_hostname import CertificateError
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.util.timeout import Timeout
+from yieldfrom_t.urllib3.packages.ssl_match_hostname import CertificateError
+from yieldfrom_t.urllib3.exceptions import (
     ClosedPoolError,
     EmptyPoolError,
     HostChangedError,
@@ -30,7 +31,7 @@ from socket import error as SocketError
 from ssl import SSLError as BaseSSLError
 
 from queue import Empty
-from yieldfrom.http.client import HTTPException
+from yieldfrom_t.http.client import HTTPException
 
 
 def async_test(f):
@@ -57,7 +58,7 @@ class TestConnectionPool(unittest.TestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         else:
@@ -110,16 +111,16 @@ class TestConnectionPool(unittest.TestCase):
         pool = HTTPConnectionPool(host='localhost', maxsize=1, block=True)
 
         try:
-            yield from pool._get_conn(timeout=0.1)
+            yield From(pool._get_conn(timeout=0.1))
 
             try:
-                yield from pool._get_conn(timeout=0.1)
+                yield From(pool._get_conn(timeout=0.1))
                 self.fail("Managed to get a connection without EmptyPoolError")
             except EmptyPoolError:
                 pass
 
             try:
-                yield from pool.request('GET', '/', pool_timeout=0.1)
+                yield From(pool.request('GET', '/', pool_timeout=0.1))
                 self.fail("Managed to get a connection without EmptyPoolError")
             except EmptyPoolError:
                 pass
@@ -133,14 +134,14 @@ class TestConnectionPool(unittest.TestCase):
     def test_pool_edgecases(self):
         pool = HTTPConnectionPool(host='localhost', maxsize=1, block=False)
 
-        conn1 = yield from pool._get_conn(timeout=0.1)
-        conn2 = yield from pool._get_conn(timeout=0.1) # New because block=False
+        conn1 = yield From(pool._get_conn(timeout=0.1))
+        conn2 = yield From(pool._get_conn(timeout=0.1)) # New because block=False
 
         pool._put_conn(conn1)
         pool._put_conn(conn2) # Should be discarded
 
-        self.assertEqual(conn1, (yield from pool._get_conn()))
-        self.assertNotEqual(conn2, (yield from pool._get_conn(timeout=0.1)))
+        self.assertEqual(conn1, (yield From(pool._get_conn())))
+        self.assertNotEqual(conn2, (yield From(pool._get_conn(timeout=0.1))))
 
         self.assertEqual(pool.num_connections, 3)
 
@@ -178,7 +179,7 @@ class TestConnectionPool(unittest.TestCase):
         def _test(exception, expect):
             pool._make_request = lambda *args, **kwargs: _raise(exception)
             try:
-                yield from pool.request('GET', '/')
+                yield From(pool.request('GET', '/'))
             except expect:
                 pass
             else:
@@ -197,7 +198,7 @@ class TestConnectionPool(unittest.TestCase):
         # See: https://github.com/shazow/urllib3/issues/76
         pool._make_request = lambda *args, **kwargs: _raise(HTTPException)
         try:
-            yield from pool.request('GET', '/', retries=1, pool_timeout=0.01)
+            yield From(pool.request('GET', '/', retries=1, pool_timeout=0.01))
         except MaxRetryError:
             pass
         else:
@@ -210,7 +211,7 @@ class TestConnectionPool(unittest.TestCase):
         c = connection_from_url('http://google.com:80')
 
         try:
-            yield from c.request('GET', 'http://yahoo.com:80', assert_same_host=True)
+            yield From(c.request('GET', 'http://yahoo.com:80', assert_same_host=True))
         except HostChangedError as e:
             pass
         else:
@@ -221,9 +222,9 @@ class TestConnectionPool(unittest.TestCase):
         pool = connection_from_url('http://google.com:80')
 
         # Populate with some connections
-        conn1 = yield from pool._get_conn(timeout=0.01)
-        conn2 = yield from pool._get_conn(timeout=0.01)
-        conn3 = yield from pool._get_conn(timeout=0.01)
+        conn1 = yield From(pool._get_conn(timeout=0.01))
+        conn2 = yield From(pool._get_conn(timeout=0.01))
+        conn3 = yield From(pool._get_conn(timeout=0.01))
         pool._put_conn(conn1)
         pool._put_conn(conn2)
 

@@ -1,7 +1,8 @@
 import logging
 import socket
 import unittest
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 
 import mock
 
@@ -20,11 +21,11 @@ sys.path.extend(['..', '../..', '../../../'])
 from tst_stuff import requires_network
 
 from port_helpers import find_unused_port
-from yieldfrom.urllib3 import (
+from yieldfrom_t.urllib3 import (
     encode_multipart_formdata,
     HTTPConnectionPool,
 )
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.exceptions import (
     ConnectTimeoutError,
     EmptyPoolError,
     DecodeError,
@@ -32,9 +33,9 @@ from yieldfrom.urllib3.exceptions import (
     ReadTimeoutError,
     ProtocolError,
 )
-from yieldfrom.urllib3.packages.six import b, u
-from yieldfrom.urllib3.util.retry import Retry
-from yieldfrom.urllib3.util.timeout import Timeout
+from yieldfrom_t.urllib3.packages.six import b, u
+from yieldfrom_t.urllib3.util.retry import Retry
+from yieldfrom_t.urllib3.util.timeout import Timeout
 
 import tornado
 from hide_from_setup.dummyserver.testcase import HTTPDummyServerTestCase
@@ -52,7 +53,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         else:
@@ -63,31 +64,31 @@ class TestConnectionPool(HTTPDummyServerTestCase):
 
     @asyncio.coroutine
     def get(self):
-        r = yield from self.pool.request('GET', '/specific_method',
-                                         fields={'method': 'GET'})
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self.pool.request('GET', '/specific_method',
+                                         fields={'method': 'GET'}))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @asyncio.coroutine
     def post_url(self):
-        r = yield from self.pool.request('POST', '/specific_method',
-                               fields={'method': 'POST'})
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self.pool.request('POST', '/specific_method',
+                               fields={'method': 'POST'}))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @asyncio.coroutine
     def test_urlopen_put(self):
-        r = yield from self.pool.urlopen('PUT', '/specific_method?method=PUT')
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self.pool.urlopen('PUT', '/specific_method?method=PUT'))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @asyncio.coroutine
     def test_wrong_specific_method(self):
         # To make sure the dummy server is actually returning failed responses
-        r = yield from self.pool.request('GET', '/specific_method',
-                               fields={'method': 'POST'})
-        self.assertEqual(r.status, 400, (yield from r.data))
+        r = yield From(self.pool.request('GET', '/specific_method',
+                               fields={'method': 'POST'}))
+        self.assertEqual(r.status, 400, (yield From(r.data)))
 
-        r = yield from self.pool.request('POST', '/specific_method',
-                               fields={'method': 'GET'})
-        self.assertEqual(r.status, 400, (yield from r.data))
+        r = yield From(self.pool.request('POST', '/specific_method',
+                               fields={'method': 'GET'}))
+        self.assertEqual(r.status, 400, (yield From(r.data)))
 
     @asyncio.coroutine
     def test_upload(self):
@@ -99,8 +100,8 @@ class TestConnectionPool(HTTPDummyServerTestCase):
             'filefield': ('lolcat.txt', data),
         }
 
-        r = yield from self.pool.request('POST', '/upload', fields=fields)
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self.pool.request('POST', '/upload', fields=fields))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @asyncio.coroutine
     def test_one_name_multiple_values(self):
@@ -110,12 +111,12 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         ]
 
         # urlencode
-        r = yield from self.pool.request('GET', '/echo', fields=fields)
-        self.assertEqual((yield from r.data), b'foo=a&foo=b')
+        r = yield From(self.pool.request('GET', '/echo', fields=fields))
+        self.assertEqual((yield From(r.data)), b'foo=a&foo=b')
 
         # multipart
-        r = yield from self.pool.request('POST', '/echo', fields=fields)
-        self.assertEqual((yield from r.data).count(b'name="foo"'), 2)
+        r = yield From(self.pool.request('POST', '/echo', fields=fields))
+        self.assertEqual((yield From(r.data).count(b'name="foo"'), 2))
 
 
     @asyncio.coroutine
@@ -132,15 +133,15 @@ class TestConnectionPool(HTTPDummyServerTestCase):
             fieldname: (filename, data),
         }
 
-        r = yield from self.pool.request('POST', '/upload', fields=fields)
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self.pool.request('POST', '/upload', fields=fields))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @asyncio.coroutine
     def test_timeout_float(self):
         url = '/sleep?seconds=0.005'
         # Pool-global timeout
         pool = HTTPConnectionPool(self.host, self.port, timeout=0.001, retries=False)
-        yield from self.aioAssertRaises(ReadTimeoutError, pool.request, 'GET', url)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool.request, 'GET', url))
 
     @asyncio.coroutine
     def test_conn_closed(self):
@@ -149,7 +150,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         pool._put_conn(conn)
         try:
             url = '/sleep?seconds=0.005'
-            yield from pool.urlopen('GET', url)
+            yield From(pool.urlopen('GET', url))
             self.fail("The request should fail with a timeout error.")
         except ReadTimeoutError:
             if conn.sock:
@@ -164,7 +165,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         # connect to the host provided so we need a dummyserver to be running.
         pool = HTTPConnectionPool(self.host, self.port)
         conn = pool._get_conn()
-        yield from pool._make_request(conn, 'GET', '/')
+        yield From(pool._make_request(conn, 'GET', '/'))
         tcp_nodelay_setting = conn.sock.getsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY)
         assert tcp_nodelay_setting > 0, ("Expected TCP_NODELAY to be set on the "
                                          "socket (with value greater than 0) "
@@ -219,39 +220,39 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout, retries=False)
 
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ReadTimeoutError, pool._make_request,
-                          conn, 'GET', url)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool._make_request,
+                          conn, 'GET', url))
         pool._put_conn(conn)
 
         time.sleep(0.02) # Wait for server to start receiving again. :(
 
-        yield from self.aioAssertRaises(ReadTimeoutError, pool.request, 'GET', url)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool.request, 'GET', url))
 
         # Request-specific timeouts should raise errors
         pool = HTTPConnectionPool(self.host, self.port, timeout=0.1, retries=False)
 
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ReadTimeoutError, pool._make_request,
-                          conn, 'GET', url, timeout=timeout)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool._make_request,
+                          conn, 'GET', url, timeout=timeout))
         pool._put_conn(conn)
 
         time.sleep(0.02) # Wait for server to start receiving again. :(
 
-        yield from self.aioAssertRaises(ReadTimeoutError, pool.request,
-                          'GET', url, timeout=timeout)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool.request,
+                          'GET', url, timeout=timeout))
 
         # Timeout int/float passed directly to request and _make_request should
         # raise a request timeout
-        yield from self.aioAssertRaises(ReadTimeoutError, pool.request,
-                          'GET', url, timeout=0.001)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool.request,
+                          'GET', url, timeout=0.001))
         conn = pool._new_conn()
-        yield from self.aioAssertRaises(ReadTimeoutError, pool._make_request, conn,
-                          'GET', url, timeout=0.001)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool._make_request, conn,
+                          'GET', url, timeout=0.001))
         pool._put_conn(conn)
 
         # Timeout int/float passed directly to _make_request should not raise a
         # request timeout if it's a high value
-        yield from pool.request('GET', url, timeout=1)
+        yield From(pool.request('GET', url, timeout=1))
 
     @requires_network
     @timed(0.5)
@@ -263,24 +264,24 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         # Pool-global timeout
         pool = HTTPConnectionPool(TARPIT_HOST, self.port, timeout=timeout)
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET', url)
+        yield From(self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET', url))
 
         # Retries
         retries = Retry(connect=0)
-        yield from self.aioAssertRaises(MaxRetryError, pool.request, 'GET', url,
-                          retries=retries)
+        yield From(self.aioAssertRaises(MaxRetryError, pool.request, 'GET', url,
+                          retries=retries))
 
         # Request-specific connection timeouts
         big_timeout = Timeout(read=0.2, connect=0.2)
         pool = HTTPConnectionPool(TARPIT_HOST, self.port,
                                   timeout=big_timeout, retries=False)
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET',
-                          url, timeout=timeout)
+        yield From(self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET',
+                          url, timeout=timeout))
 
         pool._put_conn(conn)
-        yield from self.aioAssertRaises(ConnectTimeoutError, pool.request, 'GET', url,
-                          timeout=timeout)
+        yield From(self.aioAssertRaises(ConnectTimeoutError, pool.request, 'GET', url,
+                          timeout=timeout))
 
 
     @asyncio.coroutine
@@ -289,7 +290,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         port = find_unused_port()
         pool = HTTPConnectionPool(self.host, port)
         try:
-            yield from pool.request('GET', '/', retries=Retry(connect=3))
+            yield From(pool.request('GET', '/', retries=Retry(connect=3)))
             self.fail("Should have failed with a connection error.")
         except MaxRetryError as e:
             self.assertTrue(isinstance(e.reason, ProtocolError))
@@ -303,7 +304,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout)
         conn = pool._get_conn()
         try:
-            yield from pool._make_request(conn, 'GET', url)
+            yield From(pool._make_request(conn, 'GET', url))
         except ReadTimeoutError:
             self.fail("This request shouldn't trigger a read timeout.")
 
@@ -316,19 +317,19 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         timeout = Timeout(connect=3, read=5, total=0.001)
         pool = HTTPConnectionPool(TARPIT_HOST, self.port, timeout=timeout)
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET', url)
+        yield From(self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET', url))
 
         # This will get the socket to raise an EAGAIN on the read
         timeout = Timeout(connect=3, read=0)
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout)
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ReadTimeoutError, pool._make_request, conn, 'GET', url)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool._make_request, conn, 'GET', url))
 
         # The connect should succeed and this should hit the read timeout
         timeout = Timeout(connect=3, read=5, total=0.002)
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout)
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ReadTimeoutError, pool._make_request, conn, 'GET', url)
+        yield From(self.aioAssertRaises(ReadTimeoutError, pool._make_request, conn, 'GET', url))
 
     @requires_network
     @asyncio.coroutine
@@ -337,23 +338,23 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         timeout = Timeout(total=None, connect=0.001)
         pool = HTTPConnectionPool(TARPIT_HOST, self.port, timeout=timeout)
         conn = pool._get_conn()
-        yield from self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET', url)
+        yield From(self.aioAssertRaises(ConnectTimeoutError, pool._make_request, conn, 'GET', url))
 
     @asyncio.coroutine
     def test_timeout_success(self):
         timeout = Timeout(connect=3, read=5, total=None)
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout)
-        yield from pool.request('GET', '/')
+        yield From(pool.request('GET', '/'))
         # This should not raise a "Timeout already started" error
-        yield from pool.request('GET', '/')
+        yield From(pool.request('GET', '/'))
 
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout)
         # This should also not raise a "Timeout already started" error
-        yield from pool.request('GET', '/')
+        yield From(pool.request('GET', '/'))
 
         timeout = Timeout(total=None)
         pool = HTTPConnectionPool(self.host, self.port, timeout=timeout)
-        yield from pool.request('GET', '/')
+        yield From(pool.request('GET', '/'))
 
     @asyncio.coroutine
     def test_tunnel(self):
@@ -367,7 +368,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
             conn._set_tunnel(self.host, self.port)
 
         conn._tunnel = mock.Mock(return_value=None)
-        yield from pool._make_request(conn, 'GET', '/')
+        yield From(pool._make_request(conn, 'GET', '/'))
         conn._tunnel.assert_called_once_with()
 
         # test that it's not called when tunnel is not set
@@ -376,22 +377,22 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         conn = pool._get_conn()
 
         conn._tunnel = mock.Mock(return_value=None)
-        yield from pool._make_request(conn, 'GET', '/')
+        yield From(pool._make_request(conn, 'GET', '/'))
         self.assertEqual(conn._tunnel.called, False)
 
     @asyncio.coroutine
     def test_redirect(self):
-        r = yield from self.pool.request('GET', '/redirect', fields={'target': '/'}, redirect=False)
+        r = yield From(self.pool.request('GET', '/redirect', fields={'target': '/'}, redirect=False))
         self.assertEqual(r.status, 303)
 
-        r = yield from self.pool.request('GET', '/redirect', fields={'target': '/'})
+        r = yield From(self.pool.request('GET', '/redirect', fields={'target': '/'}))
         self.assertEqual(r.status, 200)
-        self.assertEqual((yield from r.data), b'Dummy server!')
+        self.assertEqual((yield From(r.data)), b'Dummy server!')
 
     def tst_bad_connect(self):
         pool = HTTPConnectionPool('badhost.invalid', self.port)
         try:
-            yield from pool.request('GET', '/', retries=5)
+            yield From(pool.request('GET', '/', retries=5))
             self.fail("should raise timeout exception here")
         except MaxRetryError as e:
             self.assertTrue(isinstance(e.reason, ProtocolError), e.reason)
@@ -400,8 +401,8 @@ class TestConnectionPool(HTTPDummyServerTestCase):
     def test_keepalive(self):
         pool = HTTPConnectionPool(self.host, self.port, block=True, maxsize=1)
 
-        r = yield from pool.request('GET', '/keepalive?close=0')
-        r = yield from pool.request('GET', '/keepalive?close=0')
+        r = yield From(pool.request('GET', '/keepalive?close=0'))
+        r = yield From(pool.request('GET', '/keepalive?close=0'))
 
         self.assertEqual(r.status, 200)
         self.assertEqual(pool.num_connections, 1)
@@ -412,10 +413,10 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         pool = HTTPConnectionPool(self.host, self.port,
                                   block=True, maxsize=1, timeout=2)
 
-        r = yield from pool.request('GET', '/keepalive?close=1', retries=0,
+        r = yield From(pool.request('GET', '/keepalive?close=1', retries=0,
                                      headers={
                                          "Connection": "close",
-                                     })
+                                     }))
 
         self.assertEqual(pool.num_connections, 1)
 
@@ -430,10 +431,10 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         pool._put_conn(conn)
 
         # Now with keep-alive
-        r = yield from pool.request('GET', '/keepalive?close=0', retries=0,
+        r = yield From(pool.request('GET', '/keepalive?close=0', retries=0,
                                      headers={
                                          "Connection": "keep-alive",
-                                     })
+                                     }))
 
         # The dummyserver responded with Connection:keep-alive, the connection
         # persists.
@@ -443,10 +444,10 @@ class TestConnectionPool(HTTPDummyServerTestCase):
 
         # Another request asking the server to close the connection. This one
         # should get cleaned up for the next request.
-        r = yield from pool.request('GET', '/keepalive?close=1', retries=0,
+        r = yield From(pool.request('GET', '/keepalive?close=1', retries=0,
                                      headers={
                                          "Connection": "close",
-                                     })
+                                     }))
 
         self.assertEqual(r.status, 200)
 
@@ -455,21 +456,21 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         pool._put_conn(conn)
 
         # Next request
-        r = yield from pool.request('GET', '/keepalive?close=0')
+        r = yield From(pool.request('GET', '/keepalive?close=0'))
 
     @asyncio.coroutine
     def test_post_with_urlencode(self):
         data = {'banana': 'hammock', 'lol': 'cat'}
-        r = yield from self.pool.request('POST', '/echo', fields=data, encode_multipart=False)
-        self.assertEqual((yield from r.data).decode('utf-8'), urlencode(data))
+        r = yield From(self.pool.request('POST', '/echo', fields=data, encode_multipart=False))
+        self.assertEqual((yield From(r.data).decode('utf-8'), urlencode(data)))
 
     @asyncio.coroutine
     def test_post_with_multipart(self):
         data = {'banana': 'hammock', 'lol': 'cat'}
-        r = yield from self.pool.request('POST', '/echo',
+        r = yield From(self.pool.request('POST', '/echo',
                                     fields=data,
-                                    encode_multipart=True)
-        body = (yield from r.data).split(b'\r\n')
+                                    encode_multipart=True))
+        body = (yield From(r.data).split(b'\r\n'))
 
         encoded_data = encode_multipart_formdata(data)[0]
         expected_body = encoded_data.split(b'\r\n')
@@ -491,35 +492,35 @@ class TestConnectionPool(HTTPDummyServerTestCase):
 
     @asyncio.coroutine
     def test_check_gzip(self):
-        r = yield from self.pool.request('GET', '/encodingrequest',
-                                   headers={'accept-encoding': 'gzip'})
+        r = yield From(self.pool.request('GET', '/encodingrequest',
+                                   headers={'accept-encoding': 'gzip'}))
         self.assertEqual(r.headers.get('content-encoding'), 'gzip')
-        self.assertEqual((yield from r.data), b'hello, world!')
+        self.assertEqual((yield From(r.data)), b'hello, world!')
 
     @asyncio.coroutine
     def test_check_deflate(self):
-        r = yield from self.pool.request('GET', '/encodingrequest',
-                                   headers={'accept-encoding': 'deflate'})
+        r = yield From(self.pool.request('GET', '/encodingrequest',
+                                   headers={'accept-encoding': 'deflate'}))
         self.assertEqual(r.headers.get('content-encoding'), 'deflate')
-        self.assertEqual((yield from r.data), b'hello, world!')
+        self.assertEqual((yield From(r.data)), b'hello, world!')
 
     @asyncio.coroutine
     def test_bad_decode(self):
-        yield from self.aioAssertRaises(DecodeError, self.pool.request,
+        yield From(self.aioAssertRaises(DecodeError, self.pool.request,
                           'GET', '/encodingrequest',
-                          headers={'accept-encoding': 'garbage-deflate'})
+                          headers={'accept-encoding': 'garbage-deflate'}))
 
-        yield from self.aioAssertRaises(DecodeError, self.pool.request,
+        yield From(self.aioAssertRaises(DecodeError, self.pool.request,
                           'GET', '/encodingrequest',
-                          headers={'accept-encoding': 'garbage-gzip'})
+                          headers={'accept-encoding': 'garbage-gzip'}))
 
     @asyncio.coroutine
     def test_connection_count(self):
         pool = HTTPConnectionPool(self.host, self.port, maxsize=1)
 
-        yield from pool.request('GET', '/')
-        yield from pool.request('GET', '/')
-        yield from pool.request('GET', '/')
+        yield From(pool.request('GET', '/'))
+        yield From(pool.request('GET', '/'))
+        yield From(pool.request('GET', '/'))
 
         self.assertEqual(pool.num_connections, 1)
         self.assertEqual(pool.num_requests, 3)
@@ -528,9 +529,9 @@ class TestConnectionPool(HTTPDummyServerTestCase):
     def test_connection_count_bigpool(self):
         http_pool = HTTPConnectionPool(self.host, self.port, maxsize=16)
 
-        yield from http_pool.request('GET', '/')
-        yield from http_pool.request('GET', '/')
-        yield from http_pool.request('GET', '/')
+        yield From(http_pool.request('GET', '/'))
+        yield From(http_pool.request('GET', '/'))
+        yield From(http_pool.request('GET', '/'))
 
         self.assertEqual(http_pool.num_connections, 1)
         self.assertEqual(http_pool.num_requests, 3)
@@ -542,7 +543,7 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         req_data = {'lol': 'cat'}
         resp_data = urlencode(req_data).encode('utf-8')
 
-        r = yield from pool.request('GET', '/echo', fields=req_data, preload_content=False)
+        r = yield From(pool.request('GET', '/echo', fields=req_data, preload_content=False))
 
         self.assertEqual(r.read(5), resp_data[:5])
         self.assertEqual(r.read(), resp_data[5:])
@@ -565,25 +566,25 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         req2_data = {'count': 'b' * payload_size}
         resp2_data = encode_multipart_formdata(req2_data, boundary=boundary)[0]
 
-        r1 = yield from pool.request('POST', '/echo', fields=req_data, multipart_boundary=boundary, preload_content=False)
+        r1 = yield From(pool.request('POST', '/echo', fields=req_data, multipart_boundary=boundary, preload_content=False))
 
         self.assertEqual(r1.read(first_chunk), resp_data[:first_chunk])
 
         try:
-            r2 = yield from pool.request('POST', '/echo', fields=req2_data, multipart_boundary=boundary,
-                                    preload_content=False, pool_timeout=0.001)
+            r2 = yield From(pool.request('POST', '/echo', fields=req2_data, multipart_boundary=boundary,
+                                    preload_content=False, pool_timeout=0.001))
 
             # This branch should generally bail here, but maybe someday it will
             # work? Perhaps by some sort of magic. Consider it a TODO.
 
             self.assertEqual(r2.read(first_chunk), resp2_data[:first_chunk])
 
-            self.assertEqual((yield from r1.read()), resp_data[first_chunk:])
-            self.assertEqual((yield from r2.read()), resp2_data[first_chunk:])
+            self.assertEqual((yield From(r1.read()), resp_data[first_chunk:]))
+            self.assertEqual((yield From(r2.read()), resp2_data[first_chunk:]))
             self.assertEqual(pool.num_requests, 2)
 
         except EmptyPoolError:
-            self.assertEqual((yield from r1.read()), resp_data[first_chunk:])
+            self.assertEqual((yield From(r1.read()), resp_data[first_chunk:]))
             self.assertEqual(pool.num_requests, 1)
 
         self.assertEqual(pool.num_connections, 1)
@@ -602,21 +603,21 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         self.assertEqual(pool.pool.qsize(), MAXSIZE-1)
 
         # Check state after simple request
-        yield from pool.urlopen('GET', '/')
+        yield From(pool.urlopen('GET', '/'))
         self.assertEqual(pool.pool.qsize(), MAXSIZE-1)
 
         # Check state without release
-        yield from pool.urlopen('GET', '/', preload_content=False)
+        yield From(pool.urlopen('GET', '/', preload_content=False))
         self.assertEqual(pool.pool.qsize(), MAXSIZE-2)
 
-        yield from pool.urlopen('GET', '/')
+        yield From(pool.urlopen('GET', '/'))
         self.assertEqual(pool.pool.qsize(), MAXSIZE-2)
 
         # Check state after read
-        yield from pool.urlopen('GET', '/').data
+        yield From(pool.urlopen('GET', '/').data)
         self.assertEqual(pool.pool.qsize(), MAXSIZE-2)
 
-        yield from pool.urlopen('GET', '/')
+        yield From(pool.urlopen('GET', '/'))
         self.assertEqual(pool.pool.qsize(), MAXSIZE-2)
 
     @asyncio.coroutine
@@ -626,37 +627,37 @@ class TestConnectionPool(HTTPDummyServerTestCase):
         self.assertEqual(pool.pool.qsize(), MAXSIZE)
 
         # Make request without releasing connection
-        yield from pool.request('GET', '/', release_conn=False, preload_content=False)
+        yield From(pool.request('GET', '/', release_conn=False, preload_content=False))
         self.assertEqual(pool.pool.qsize(), MAXSIZE-1)
 
     @asyncio.coroutine
     def test_dns_error(self):
         pool = HTTPConnectionPool('thishostdoesnotexist.invalid', self.port, timeout=0.001)
-        yield from self.aioAssertRaises(MaxRetryError, pool.request, 'GET', '/test', retries=2)
+        yield From(self.aioAssertRaises(MaxRetryError, pool.request, 'GET', '/test', retries=2))
 
     @asyncio.coroutine
     def test_source_address(self):
         for addr in VALID_SOURCE_ADDRESSES:
             pool = HTTPConnectionPool(self.host, self.port, source_address=addr, retries=False)
-            r = yield from pool.request('GET', '/source_address')
-            assert (yield from r.data) == b(addr[0]), (
+            r = yield From(pool.request('GET', '/source_address'))
+            assert (yield From(r.data) == b(addr[0]), (
                 "expected the response to contain the source address {addr}, "
-                "but was {data}".format(data=(yield from r.data), addr=b(addr[0])))
+                "but was {data}".format(data=(yield From(r.data)), addr=b(addr[0]))))
 
     @asyncio.coroutine
     def test_source_address_error(self):
         for addr in INVALID_SOURCE_ADDRESSES:
             pool = HTTPConnectionPool(self.host, self.port,
                     source_address=addr, retries=False)
-            yield from self.aioAssertRaises(ProtocolError,
-                    pool.request, 'GET', '/source_address')
+            yield From(self.aioAssertRaises(ProtocolError,
+                    pool.request, 'GET', '/source_address'))
 
     @asyncio.coroutine
     def test_httplib_headers_case_insensitive(self):
         HEADERS = {'Content-Length': '0', 'Content-type': 'text/plain',
                     'Server': 'TornadoServer/%s' % tornado.version}
-        r = yield from self.pool.request('GET', '/specific_method',
-                               fields={'method': 'GET'})
+        r = yield From(self.pool.request('GET', '/specific_method',
+                               fields={'method': 'GET'}))
         self.assertEqual(HEADERS, dict(r.headers.items())) # to preserve case sensitivity
 
 
@@ -667,9 +668,9 @@ class TestRetry(HTTPDummyServerTestCase):
     @asyncio.coroutine
     def test_max_retry(self):
         try:
-            r = yield from self.pool.request('GET', '/redirect',
+            r = yield From(self.pool.request('GET', '/redirect',
                                               fields={'target': '/'},
-                                              retries=0)
+                                              retries=0))
             self.fail("Failed to raise MaxRetryError exception, returned %r" % r.status)
         except MaxRetryError:
             pass
@@ -677,14 +678,14 @@ class TestRetry(HTTPDummyServerTestCase):
     @asyncio.coroutine
     def test_disabled_retry(self):
         """ Disabled retries should disable redirect handling. """
-        r = yield from self.pool.request('GET', '/redirect',
+        r = yield From(self.pool.request('GET', '/redirect',
                                           fields={'target': '/'},
-                                          retries=False)
+                                          retries=False))
         self.assertEqual(r.status, 303)
 
-        r = yield from self.pool.request('GET', '/redirect',
+        r = yield From(self.pool.request('GET', '/redirect',
                                           fields={'target': '/'},
-                                          retries=Retry(redirect=False))
+                                          retries=Retry(redirect=False)))
         self.assertEqual(r.status, 303)
 
         # don't pass for orig
@@ -695,9 +696,9 @@ class TestRetry(HTTPDummyServerTestCase):
     def test_read_retries(self):
         """ Should retry for status codes in the whitelist """
         retry = Retry(read=1, status_forcelist=[418])
-        resp = yield from self.pool.request('GET', '/successful_retry',
+        resp = yield From(self.pool.request('GET', '/successful_retry',
                                              headers={'test-name': 'test_read_retries'},
-                                             retries=retry)
+                                             retries=retry))
         self.assertEqual(resp.status, 200)
 
     @asyncio.coroutine
@@ -705,26 +706,26 @@ class TestRetry(HTTPDummyServerTestCase):
         """ HTTP response w/ status code in the whitelist should be retried """
         headers = {'test-name': 'test_read_total_retries'}
         retry = Retry(total=1, status_forcelist=[418])
-        resp = yield from self.pool.request('GET', '/successful_retry',
-                                            headers=headers, retries=retry)
+        resp = yield From(self.pool.request('GET', '/successful_retry',
+                                            headers=headers, retries=retry))
         self.assertEqual(resp.status, 200)
 
     @asyncio.coroutine
     def test_retries_wrong_whitelist(self):
         """HTTP response w/ status code not in whitelist shouldn't be retried"""
         retry = Retry(total=1, status_forcelist=[202])
-        resp = yield from self.pool.request('GET', '/successful_retry',
+        resp = yield From(self.pool.request('GET', '/successful_retry',
                                              headers={'test-name': 'test_wrong_whitelist'},
-                                             retries=retry)
+                                             retries=retry))
         self.assertEqual(resp.status, 418)
 
     @asyncio.coroutine
     def test_default_method_whitelist_retried(self):
         """ urllib3 should retry methods in the default method whitelist """
         retry = Retry(total=1, status_forcelist=[418])
-        resp = yield from self.pool.request('OPTIONS', '/successful_retry',
+        resp = yield From(self.pool.request('OPTIONS', '/successful_retry',
                                              headers={'test-name': 'test_default_whitelist'},
-                                             retries=retry)
+                                             retries=retry))
         self.assertEqual(resp.status, 200)
 
     @asyncio.coroutine
@@ -733,15 +734,15 @@ class TestRetry(HTTPDummyServerTestCase):
         headers = {'test-name': 'test_wrong_method_whitelist'}
         retry = Retry(total=1, status_forcelist=[418],
                       method_whitelist=['POST'])
-        resp = yield from self.pool.request('GET', '/successful_retry',
-                                 headers=headers, retries=retry)
+        resp = yield From(self.pool.request('GET', '/successful_retry',
+                                 headers=headers, retries=retry))
         self.assertEqual(resp.status, 418)
 
     @asyncio.coroutine
     def test_read_retries_unsuccessful(self):
         headers = {'test-name': 'test_read_retries_unsuccessful'}
-        resp = yield from self.pool.request('GET', '/successful_retry',
-                                 headers=headers, retries=1)
+        resp = yield From(self.pool.request('GET', '/successful_retry',
+                                 headers=headers, retries=1))
         self.assertEqual(resp.status, 418)
 
     @asyncio.coroutine
@@ -749,11 +750,11 @@ class TestRetry(HTTPDummyServerTestCase):
         """ It should be possible to reuse a Retry object across requests """
         headers = {'test-name': 'test_retry_safe'}
         retry = Retry(total=1, status_forcelist=[418])
-        resp = yield from self.pool.request('GET', '/successful_retry',
-                                 headers=headers, retries=retry)
+        resp = yield From(self.pool.request('GET', '/successful_retry',
+                                 headers=headers, retries=retry))
         self.assertEqual(resp.status, 200)
-        resp = yield from self.pool.request('GET', '/successful_retry',
-                                 headers=headers, retries=retry)
+        resp = yield From(self.pool.request('GET', '/successful_retry',
+                                 headers=headers, retries=retry))
         self.assertEqual(resp.status, 200)
 
 

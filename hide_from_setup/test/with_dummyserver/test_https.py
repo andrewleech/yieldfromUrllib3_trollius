@@ -3,7 +3,8 @@ import logging
 import ssl
 import unittest
 import warnings
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 import functools
 
 import mock
@@ -20,13 +21,13 @@ from tst_stuff import (
     TARPIT_HOST,
 )
 
-from yieldfrom.urllib3 import HTTPSConnectionPool
-from yieldfrom.urllib3.connection import (
+from yieldfrom_t.urllib3 import HTTPSConnectionPool
+from yieldfrom_t.urllib3.connection import (
     VerifiedHTTPSConnection,
     UnverifiedHTTPSConnection,
     RECENT_DATE,
 )
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.exceptions import (
     SSLError,
     ReadTimeoutError,
     ConnectTimeoutError,
@@ -34,7 +35,7 @@ from yieldfrom.urllib3.exceptions import (
     MaxRetryError,
     SystemTimeWarning,
 )
-from yieldfrom.urllib3.util.timeout import Timeout
+from yieldfrom_t.urllib3.util.timeout import Timeout
 
 log = logging.getLogger('urllib3.connectionpool')
 log.setLevel(logging.NOTSET)
@@ -59,7 +60,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         except Exception as e:
@@ -72,14 +73,14 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
     @async_test
     def test_simple(self):
-        r = yield from self._pool.request('GET', '/')
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self._pool.request('GET', '/'))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @async_test
     def test_set_ssl_version_to_tlsv1(self):
         self._pool.ssl_version = ssl.PROTOCOL_TLSv1
-        r = yield from self._pool.request('GET', '/')
-        self.assertEqual(r.status, 200, (yield from r.data))
+        r = yield From(self._pool.request('GET', '/'))
+        self.assertEqual(r.status, 200, (yield From(r.data)))
 
     @async_test
     def test_verified(self):
@@ -91,7 +92,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         self.assertEqual(conn.__class__, VerifiedHTTPSConnection)
 
         with mock.patch('warnings.warn') as warn:
-            r = yield from https_pool.request('GET', '/')
+            r = yield From(https_pool.request('GET', '/'))
             self.assertEqual(r.status, 200)
             self.assertTrue(len(warn.call_args_list)==0, warn.call_args_list)
             #self.assertTrue(warn.call_args_list[0].startswith('call('), warn.call_args_list)
@@ -102,7 +103,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                          cert_reqs='CERT_REQUIRED',
                                          ca_certs=DEFAULT_CA)
         try:
-            yield from https_pool.request('GET', '/')
+            yield From(https_pool.request('GET', '/'))
             self.fail("Didn't raise SSL invalid common name")
         except SSLError as e:
             self.assertTrue("doesn't match" in str(e))
@@ -114,7 +115,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                          ca_certs=DEFAULT_CA_BAD)
 
         try:
-            yield from https_pool.request('GET', '/')
+            yield From(https_pool.request('GET', '/'))
             self.fail("Didn't raise SSL error with bad CA certs")
         except (SSLError, MaxRetryError, ConnectTimeoutError) as e:
             pass
@@ -126,7 +127,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                          cert_reqs='CERT_REQUIRED')
 
         try:
-            yield from https_pool.request('GET', '/')
+            yield From(https_pool.request('GET', '/'))
             self.fail("Didn't raise SSL error with no CA certs when"
                       "CERT_REQUIRED is set")
         except (SSLError, MaxRetryError, ConnectTimeoutError) as e:
@@ -139,7 +140,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         pool = HTTPSConnectionPool(self.host, self.port)
         pool.ConnectionCls = None
         self.assertRaises(SSLError, pool._new_conn)
-        yield from self.aioAssertRaises(SSLError, pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises(SSLError, pool.request, 'GET', '/'))
 
     @async_test
     def test_unverified_ssl(self):
@@ -148,7 +149,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         pool.ConnectionCls = UnverifiedHTTPSConnection
 
         with mock.patch('warnings.warn') as warn:
-            r = yield from pool.request('GET', '/')
+            r = yield From(pool.request('GET', '/'))
             self.assertEqual(r.status, 200)
             self.assertTrue(warn.called)
 
@@ -163,7 +164,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                    ca_certs=DEFAULT_CA_BAD)
 
         with mock.patch('warnings.warn') as warn:
-            r = yield from pool.request('GET', '/')
+            r = yield From(pool.request('GET', '/'))
             self.assertEqual(r.status, 200)
             self.assertTrue(warn.called)
 
@@ -197,7 +198,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         https_pool = HTTPSConnectionPool('httpbin.org', 443,
                                          cert_reqs=ssl.CERT_REQUIRED)
 
-        yield from https_pool.request('HEAD', '/')
+        yield From(https_pool.request('HEAD', '/'))
 
     @async_test
     def test_assert_hostname_false(self):
@@ -206,7 +207,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                          ca_certs=DEFAULT_CA)
 
         https_pool.assert_hostname = False
-        yield from https_pool.request('GET', '/')
+        yield From(https_pool.request('GET', '/'))
 
     @async_test
     def test_assert_specific_hostname(self):
@@ -215,7 +216,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                          ca_certs=DEFAULT_CA)
 
         https_pool.assert_hostname = 'localhost'
-        yield from https_pool.request('GET', '/')
+        yield From(https_pool.request('GET', '/'))
 
     @async_test
     def tst_assert_fingerprint_md5(self):
@@ -225,7 +226,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
         https_pool.assert_fingerprint = 'CA:84:E1:AD0E5a:ef:2f:C3:09' \
                                         ':E7:30:F8:CD:C8:5B'
-        yield from https_pool.request('GET', '/')
+        yield From(https_pool.request('GET', '/'))
 
     @async_test
     def test_assert_fingerprint_sha1(self):
@@ -235,7 +236,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
         https_pool.assert_fingerprint = 'CC:45:6A:90:82:F7FF:C0:8218:8e:' \
                                         '7A:F2:8A:D7:1E:07:33:67:DE'
-        yield from https_pool.request('GET', '/')
+        yield From(https_pool.request('GET', '/'))
 
     @async_test
     def test_assert_invalid_fingerprint(self):
@@ -247,17 +248,17 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         https_pool.assert_fingerprint = 'AA:AA:AA:AA:AA:AAAA:AA:AAAA:AA:' \
                                         'AA:AA:AA:AA:AA:AA:AA:AA:AA'
 
-        yield from self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/'))
         https_pool._get_conn()
 
         # Uneven length
         https_pool.assert_fingerprint = 'AA:A'
-        yield from self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/'))
         https_pool._get_conn()
 
         # Invalid length
         https_pool.assert_fingerprint = 'AA'
-        yield from self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/'))
 
     @async_test
     def test_verify_none_and_bad_fingerprint(self):
@@ -267,7 +268,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
         https_pool.assert_fingerprint = 'AA:AA:AA:AA:AA:AAAA:AA:AAAA:AA:' \
                                         'AA:AA:AA:AA:AA:AA:AA:AA:AA'
-        yield from self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises(SSLError, https_pool.request, 'GET', '/'))
 
     @async_test
     def test_verify_none_and_good_fingerprint(self):
@@ -277,7 +278,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
         https_pool.assert_fingerprint = 'CC:45:6A:90:82:F7FF:C0:8218:8e:' \
                                         '7A:F2:8A:D7:1E:07:33:67:DE'
-        yield from https_pool.request('GET', '/')
+        yield From(https_pool.request('GET', '/'))
 
     @requires_network
     @async_test
@@ -291,7 +292,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         https_pool = HTTPSConnectionPool(TARPIT_HOST, self.port,
                                          timeout=timeout, retries=False,
                                          cert_reqs='CERT_REQUIRED')
-        yield from self.aioAssertRaises(ConnectTimeoutError, https_pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises(ConnectTimeoutError, https_pool.request, 'GET', '/'))
 
         timeout = Timeout(read=0.001)
         https_pool = HTTPSConnectionPool(self.host, self.port,
@@ -302,7 +303,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
                                         '7A:F2:8A:D7:1E:07:33:67:DE'
         url = '/sleep?seconds=0.005'
         try:
-            yield from https_pool.request('GET', url)
+            yield From(https_pool.request('GET', url))
         except ReadTimeoutError as e:
             pass
         else:
@@ -311,7 +312,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         timeout = Timeout(total=None)
         https_pool = HTTPSConnectionPool(self.host, self.port, timeout=timeout,
                                          cert_reqs='CERT_NONE')
-        yield from https_pool.request('GET', '/')
+        yield From(https_pool.request('GET', '/'))
 
     @async_test
     def test_tunnel(self):
@@ -325,7 +326,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         except AttributeError: # python 2.6
             conn._set_tunnel(self.host, self.port)
         conn._tunnel = mock.Mock(return_value=iter([None, None, None]))
-        yield from https_pool._make_request(conn, 'GET', '/')
+        yield From(https_pool._make_request(conn, 'GET', '/'))
         conn._tunnel.assert_called_once_with()
 
     @requires_network
@@ -341,7 +342,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
         https_pool = new_pool(Timeout(connect=0.001))
         conn = https_pool._new_conn()
         try:
-            yield from https_pool.request('GET', '/')
+            yield From(https_pool.request('GET', '/'))
         except ConnectTimeoutError as e:
             pass
         except Exception as e:
@@ -350,17 +351,17 @@ class TestHTTPS(HTTPSDummyServerTestCase):
             pass
         else:
             self.fail('connect timeout error not raised')
-        yield from self.aioAssertRaises(ConnectTimeoutError, https_pool._make_request, conn, 'GET', '/')
+        yield From(self.aioAssertRaises(ConnectTimeoutError, https_pool._make_request, conn, 'GET', '/'))
 
         https_pool = new_pool(Timeout(connect=5))
-        yield from self.aioAssertRaises(ConnectTimeoutError, https_pool.request, 'GET', '/',
-                          timeout=Timeout(connect=0.001))
+        yield From(self.aioAssertRaises(ConnectTimeoutError, https_pool.request, 'GET', '/',
+                          timeout=Timeout(connect=0.001)))
 
         t = Timeout(total=None)
         https_pool = new_pool(t)
         conn = https_pool._new_conn()
-        yield from self.aioAssertRaises(ConnectTimeoutError, https_pool.request, 'GET', '/',
-                          timeout=Timeout(total=None, connect=0.001))
+        yield From(self.aioAssertRaises(ConnectTimeoutError, https_pool.request, 'GET', '/',
+                          timeout=Timeout(total=None, connect=0.001)))
 
     @async_test
     def test_enhanced_ssl_connection(self):
@@ -377,7 +378,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
     def tst_ssl_correct_system_time(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter('always')
-            yield from self._pool.request('GET', '/')
+            yield From(self._pool.request('GET', '/'))
 
         self.assertEqual([], w)
 
@@ -388,7 +389,7 @@ class TestHTTPS(HTTPSDummyServerTestCase):
 
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter('always')
-                yield from self._pool.request('GET', '/')
+                yield From(self._pool.request('GET', '/'))
 
             self.assertEqual(len(w), 1)
             warning = w[0]
@@ -404,7 +405,7 @@ class TestHTTPS_TLSv1(HTTPSDummyServerTestCase):
     def aioAssertRaises(self, exc, f, *args, **kwargs):
         """tests a coroutine for whether it raises given error."""
         try:
-            yield from f(*args, **kwargs)
+            yield From(f(*args, **kwargs))
         except exc as e:
             pass
         else:
@@ -416,17 +417,17 @@ class TestHTTPS_TLSv1(HTTPSDummyServerTestCase):
     @async_test
     def test_set_ssl_version_to_sslv3(self):
         self._pool.ssl_version = ssl.PROTOCOL_SSLv3
-        yield from self.aioAssertRaises((SSLError, ConnectTimeoutError, MaxRetryError), self._pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises((SSLError, ConnectTimeoutError, MaxRetryError), self._pool.request, 'GET', '/'))
 
     @async_test
     def test_ssl_version_as_string(self):
         self._pool.ssl_version = 'PROTOCOL_SSLv3'
-        yield from self.aioAssertRaises((SSLError, ConnectTimeoutError, MaxRetryError), self._pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises((SSLError, ConnectTimeoutError, MaxRetryError), self._pool.request, 'GET', '/'))
 
     @async_test
     def test_ssl_version_as_short_string(self):
         self._pool.ssl_version = 'SSLv3'
-        yield from self.aioAssertRaises((SSLError, ConnectTimeoutError, MaxRetryError), self._pool.request, 'GET', '/')
+        yield From(self.aioAssertRaises((SSLError, ConnectTimeoutError, MaxRetryError), self._pool.request, 'GET', '/'))
 
     # def test_fail(self):
     #     self.assertTrue(False, 'duh')

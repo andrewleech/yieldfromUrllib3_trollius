@@ -2,15 +2,16 @@
 import os
 import unittest
 import functools
-import asyncio
+import trollius as asyncio
+from trollius import From, Return
 import sys
 sys.path.append('../../')
 
 from urllib.parse import urljoin
-from yieldfrom.urllib3.connectionpool import HTTPConnectionPool
-from yieldfrom.urllib3.poolmanager import PoolManager
-from yieldfrom.urllib3 import connection_from_url
-from yieldfrom.urllib3.exceptions import (
+from yieldfrom_t.urllib3.connectionpool import HTTPConnectionPool
+from yieldfrom_t.urllib3.poolmanager import PoolManager
+from yieldfrom_t.urllib3 import connection_from_url
+from yieldfrom_t.urllib3.exceptions import (
     ClosedPoolError,
     LocationValueError,
     EmptyPoolError,
@@ -44,25 +45,26 @@ class RequestsTestCase(unittest.TestCase):
 
         testLoop = asyncio.get_event_loop()
         testLoop.set_debug(True)
-        count = 0
+        global test_queue_overload_count
+        test_queue_overload_count = 0
 
         @asyncio.coroutine
         def get_page():
-            nonlocal count
+            global test_queue_overload_count
             try:
-                resp = yield from http.request('GET', '/delay/1', pool_timeout=3)
-                pg = yield from resp.data
+                resp = yield From(http.request('GET', '/delay/1', pool_timeout=3))
+                pg = yield From(resp.data)
                 self.assertTrue(b'Connection' in pg, pg)
             except EmptyPoolError:
                 pass
             except Exception as e:
                 raise
             else:
-                count += 1
+                test_queue_overload_count += 1
 
         pageGetters = [get_page(), get_page(), get_page(), get_page(), get_page()]
         testLoop.run_until_complete(asyncio.wait(pageGetters, return_when=asyncio.ALL_COMPLETED))
-        self.assertGreater(count, 4, 'not all page_getters ran')
+        self.assertGreater(test_queue_overload_count, 4, 'not all page_getters ran')
 
 
 
